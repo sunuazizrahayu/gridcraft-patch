@@ -1,7 +1,8 @@
-# AppImage for every push to main and every PR, so a change can be downloaded and tried
-# on any Linux distro without waiting for the signed release pipeline (which only runs on
-# the `release` branch). The `CI` workflow stays the quality gate (`cargo xtask ci`); this
-# one just runs `packaging/linux/package.sh --formats "appimage"` and uploads the result.
+# AppImage (Linux) for every push to main and every PR, so a change can be downloaded
+# and tried on any Linux distro without waiting for the signed release pipeline (which
+# only runs on the `release` branch). The `CI` workflow stays the quality gate
+# (`cargo xtask ci`); this one just runs `packaging/linux/package.sh --formats "appimage"`
+# and uploads the result.
 name: Build
 
 on:
