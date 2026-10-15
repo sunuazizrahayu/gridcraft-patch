@@ -1,8 +1,7 @@
-# Plain debug/release binaries for every push to main and every PR, so a change can be
-# downloaded and tried without waiting for the signed release pipeline (which only runs
-# on the `release` branch). The `CI` workflow stays the quality gate (`cargo xtask ci`);
-# this one just builds `gridcraft` + `gridcraft-cli` on Linux, Windows and macOS and
-# uploads them as artifacts.
+# AppImage for every push to main and every PR, so a change can be downloaded and tried
+# on any Linux distro without waiting for the signed release pipeline (which only runs on
+# the `release` branch). The `CI` workflow stays the quality gate (`cargo xtask ci`); this
+# one just runs `packaging/linux/package.sh --formats "appimage"` and uploads the result.
 name: Build
 
 on:
@@ -19,27 +18,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: build (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+  appimage:
+    name: AppImage (x86_64)
+    # Ubuntu 22.04 (glibc 2.35): the AppImage then runs on 22.04 and newer distros.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
     env:
       CARGO_TERM_COLOR: always
       CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Linux build dependencies (winit, wgpu, rfd)
-        if: runner.os == 'Linux'
+      - name: Install Linux build dependencies (winit, wgpu, rfd, zsync)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev \
-            libxi-dev libgtk-3-dev libfontconfig1-dev libfreetype-dev mesa-vulkan-drivers
+            libxi-dev libgtk-3-dev libfontconfig1-dev libfreetype-dev mesa-vulkan-drivers zsync
 
       - name: Install Rust (stable, minimal)
         run: |
@@ -50,34 +45,13 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build gridcraft and gridcraft-cli
-        run: cargo build --locked --release -p gridcraft -p gridcraft-cli
+      - name: Build the AppImage
+        run: packaging/linux/package.sh --formats "appimage"
 
-      - name: Smoke-test the CLI
-        shell: bash
-        run: |
-          CLI="target/release/gridcraft-cli"
-          [ -f "$CLI.exe" ] && CLI="$CLI.exe"
-          "$CLI" --version
-          "$CLI" eval '=SUM(1,2,3)'
-
-      - name: Stage binaries
-        shell: bash
-        run: |
-          mkdir -p dist/build
-          for b in gridcraft gridcraft-cli; do
-            if [ -f "target/release/$b.exe" ]; then
-              cp "target/release/$b.exe" dist/build/
-            else
-              cp "target/release/$b" dist/build/
-            fi
-          done
-          ls -la dist/build
-
-      - name: Upload binaries
+      - name: Upload the AppImage
         uses: actions/upload-artifact@v4
         with:
-          name: gridcraft-${{ matrix.os }}
-          path: dist/build/
+          name: gridcraft-linux-x86_64-appimage
+          path: dist/release/*.AppImage*
           if-no-files-found: error
           retention-days: 7
